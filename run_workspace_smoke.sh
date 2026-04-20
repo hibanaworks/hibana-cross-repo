@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${ROOT_DIR}"
+TOOLCHAIN="${TOOLCHAIN:-1.95.0}"
 
 HIBANA_DIR="${ROOT_DIR}/../hibana"
 HIBANA_EPF_DIR="${ROOT_DIR}/../hibana-epf"
@@ -15,7 +16,7 @@ for required in "${HIBANA_DIR}" "${HIBANA_EPF_DIR}" "${HIBANA_MGMT_DIR}"; do
   fi
 done
 
-cargo test \
+cargo +"${TOOLCHAIN}" test \
   --config "patch.\"https://github.com/hibanaworks/hibana\".hibana.path=\"${HIBANA_DIR}\"" \
   --config "patch.\"https://github.com/hibanaworks/hibana-epf\".hibana-epf.path=\"${HIBANA_EPF_DIR}\"" \
   --config "patch.\"https://github.com/hibanaworks/hibana-mgmt\".hibana-mgmt.path=\"${HIBANA_MGMT_DIR}\""

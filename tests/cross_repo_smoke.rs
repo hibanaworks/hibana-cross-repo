@@ -1,34 +1,30 @@
-use hibana::{
-    g,
-    g::advanced::{
-        project,
-        steps::{SendStep, SeqSteps, StepCons, StepNil},
-    },
-    substrate::{
-        cap::advanced::CapsMask, cap::advanced::MintConfig, policy::PolicySlot, tap::TapEvent,
-        transport::TransportSnapshot,
-    },
-};
-use hibana_epf::{Action, Header, HostSlots, ScratchLease, Slot, loader::ImageLoader, run_with};
-use hibana_mgmt::{
-    LoadRequest, ROLE_CLUSTER, ROLE_CONTROLLER, Request, SubscribeReq, observe_stream,
-    request_reply,
-};
+use std::fs;
+use std::path::PathBuf;
 
-type MgmtAppSteps =
-    StepCons<SendStep<g::Role<ROLE_CONTROLLER>, g::Role<ROLE_CLUSTER>, g::Msg<120, u32>>, StepNil>;
-type MgmtProgramSteps = SeqSteps<request_reply::ProgramSteps, MgmtAppSteps>;
-const MGMT_APP: g::Program<MgmtAppSteps> =
-    g::send::<g::Role<ROLE_CONTROLLER>, g::Role<ROLE_CLUSTER>, g::Msg<120, u32>, 0>();
-const MGMT_PROGRAM: g::Program<MgmtProgramSteps> = g::seq(request_reply::PROGRAM, MGMT_APP);
+use hibana::substrate::{
+    cap::advanced::CapsMask,
+    policy::PolicySlot,
+    tap::TapEvent,
+    transport::{TransportSnapshot, TransportSnapshotParts},
+};
+use hibana_epf::{
+    Action, Header, HostSlots, PolicyAnnotation, ROLE_CLUSTER as EPF_ROLE_CLUSTER,
+    ROLE_CONTROLLER as EPF_ROLE_CONTROLLER, ScratchLease, Slot, loader::ImageLoader, run_with,
+};
+use hibana_mgmt::{LoadRequest, Request, SubscribeReq};
 
-type ObserveAppSteps =
-    StepCons<SendStep<g::Role<ROLE_CONTROLLER>, g::Role<ROLE_CLUSTER>, g::Msg<121, ()>>, StepNil>;
-type ObserveProgramSteps = SeqSteps<observe_stream::ProgramSteps, ObserveAppSteps>;
-const OBSERVE_APP: g::Program<ObserveAppSteps> =
-    g::send::<g::Role<ROLE_CONTROLLER>, g::Role<ROLE_CLUSTER>, g::Msg<121, ()>, 0>();
-const OBSERVE_PROGRAM: g::Program<ObserveProgramSteps> =
-    g::seq(observe_stream::PROGRAM, OBSERVE_APP);
+fn sibling_path(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("cross-repo harness has parent")
+        .join(path)
+}
+
+fn read_sibling(path: &str) -> String {
+    let full = sibling_path(path);
+    fs::read_to_string(&full)
+        .unwrap_or_else(|err| panic!("read {} failed: {}", full.display(), err))
+}
 
 fn header_for(code: &[u8], mem_len: u16) -> Header {
     Header {
@@ -41,11 +37,24 @@ fn header_for(code: &[u8], mem_len: u16) -> Header {
 }
 
 #[test]
-fn request_reply_program_projects_from_external_crate_context() {
-    let _controller: hibana::g::advanced::RoleProgram<'_, ROLE_CONTROLLER, MintConfig> =
-        project(&MGMT_PROGRAM);
-    let _cluster: hibana::g::advanced::RoleProgram<'_, ROLE_CLUSTER, MintConfig> =
-        project(&MGMT_PROGRAM);
+fn mgmt_surface_uses_attach_helpers_without_raw_program_exports() {
+    for path in [
+        "hibana-mgmt/src/request_reply.rs",
+        "hibana-mgmt/src/observe_stream.rs",
+    ] {
+        let src = read_sibling(path);
+        assert!(src.contains("pub fn attach_controller"));
+        assert!(src.contains("pub fn attach_cluster"));
+        assert!(!src.contains("pub const PROGRAM"));
+        assert!(!src.contains("pub const PREFIX"));
+        assert!(!src.contains("g::advanced::steps"));
+        assert!(!src.contains("const APP: g::Program<_>"));
+        assert!(!src.contains("static APP: g::Program<_>"));
+        assert!(!src.contains("const PROGRAM: g::Program<_>"));
+        assert!(!src.contains("static PROGRAM: g::Program<_>"));
+        assert!(!src.contains("project(&PROGRAM)"));
+        assert!(!src.contains("project::<"));
+    }
 
     let _request = Request::LoadAndActivate(LoadRequest {
         slot: PolicySlot::Route,
@@ -53,17 +62,32 @@ fn request_reply_program_projects_from_external_crate_context() {
         fuel_max: 64,
         mem_len: 128,
     });
+    let _subscribe = SubscribeReq::default();
 }
 
 #[test]
-fn observe_stream_program_projects_from_external_crate_context() {
-    let _controller: hibana::g::advanced::RoleProgram<'_, ROLE_CONTROLLER, MintConfig> =
-        project(&OBSERVE_PROGRAM);
-    let _cluster: hibana::g::advanced::RoleProgram<'_, ROLE_CLUSTER, MintConfig> =
-        project(&OBSERVE_PROGRAM);
+fn epf_surface_exposes_lifecycle_attach_helpers() {
+    let src = read_sibling("hibana-epf/src/lib.rs");
+    assert!(src.contains("pub fn attach_controller"));
+    assert!(src.contains("pub fn attach_cluster"));
+    assert!(!src.contains("pub const PROGRAM"));
+    assert!(!src.contains("pub const PREFIX"));
+    assert!(!src.contains("g::advanced::steps"));
+    assert!(!src.contains("const APP: g::Program<_>"));
+    assert!(!src.contains("static APP: g::Program<_>"));
+    assert!(!src.contains("const PROGRAM: g::Program<_>"));
+    assert!(!src.contains("static PROGRAM: g::Program<_>"));
+    assert!(!src.contains("project(&PROGRAM)"));
+    assert!(!src.contains("project::<"));
 
-    let _subscribe = SubscribeReq::default();
-    let _tap = TapEvent::default();
+    let kinds = read_sibling("hibana-epf/src/control_kinds.rs");
+    assert!(kinds.contains("pub struct PolicyLoadKind;"));
+    assert!(kinds.contains("pub struct PolicyActivateKind;"));
+    assert!(kinds.contains("pub struct PolicyRevertKind;"));
+    assert!(kinds.contains("pub struct PolicyAnnotateKind;"));
+
+    let _ = (EPF_ROLE_CONTROLLER, EPF_ROLE_CLUSTER);
+    let _annotation = PolicyAnnotation { digest: 7 };
 }
 
 #[test]
@@ -87,7 +111,12 @@ fn epf_runtime_executes_under_split_repo_dependency_shape() {
         CapsMask::allow_all(),
         None,
         None,
-        |ctx| ctx.set_transport_snapshot(TransportSnapshot::new(None, Some(3))),
+        |ctx| {
+            ctx.set_transport_snapshot(TransportSnapshot::from_parts(TransportSnapshotParts {
+                queue_depth: Some(3),
+                ..TransportSnapshotParts::new()
+            }))
+        },
     );
     assert_eq!(action, Action::Route { arm: 3 });
 }
