@@ -13,6 +13,6 @@ publish = false
 default = []
 
 [dependencies]
-hibana = { version = "0.1.0", path = "../hibana", default-features = false, features = ["std"] }
-hibana-epf = { version = "0.1.0", path = "../hibana-epf", default-features = false, features = ["std"] }
-hibana-mgmt = { version = "0.1.0", path = "../hibana-mgmt", default-features = false, features = ["std"] }
+hibana = { git = "https://github.com/hibanaworks/hibana", rev = "8f347b5becf03cdcbc3a6a0e6170e846058f36d0", default-features = false, features = ["std"] }
+hibana-epf = { git = "https://github.com/hibanaworks/hibana-epf", rev = "ae2ba786c0db2ddccc59871fd577c8f66a2cba23", default-features = false, features = ["std"] }
+hibana-mgmt = { git = "https://github.com/hibanaworks/hibana-mgmt", rev = "e87ed6d1e995ebea31c848d8858b940b2bac4b83", default-features = false, features = ["std"] }

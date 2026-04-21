@@ -2,7 +2,6 @@ use std::fs;
 use std::path::PathBuf;
 
 use hibana::substrate::{
-    cap::advanced::CapsMask,
     policy::PolicySlot,
     tap::TapEvent,
     transport::{TransportSnapshot, TransportSnapshotParts},
@@ -56,6 +55,12 @@ fn mgmt_surface_uses_attach_helpers_without_raw_program_exports() {
         assert!(!src.contains("project::<"));
     }
 
+    let request_reply = read_sibling("hibana-mgmt/src/request_reply.rs");
+    assert!(request_reply.contains("GenericCapToken<LoadBeginKind>"));
+    assert!(request_reply.contains("GenericCapToken<LoadCommitKind>"));
+    assert!(!request_reply.contains("Msg<LABEL_MGMT_LOAD_BEGIN,"));
+    assert!(!request_reply.contains("Msg<LABEL_MGMT_LOAD_COMMIT,"));
+
     let _request = Request::LoadAndActivate(LoadRequest {
         slot: PolicySlot::Route,
         code: &[0x30, 0x03, 0x00, 0x01],
@@ -85,6 +90,14 @@ fn epf_surface_exposes_lifecycle_attach_helpers() {
     assert!(kinds.contains("pub struct PolicyActivateKind;"));
     assert!(kinds.contains("pub struct PolicyRevertKind;"));
     assert!(kinds.contains("pub struct PolicyAnnotateKind;"));
+    assert!(src.contains("GenericCapToken<PolicyLoadKind>"));
+    assert!(src.contains("GenericCapToken<PolicyActivateKind>"));
+    assert!(src.contains("GenericCapToken<PolicyRevertKind>"));
+    assert!(src.contains("GenericCapToken<PolicyAnnotateKind>"));
+    assert!(!src.contains("Msg<LABEL_POLICY_LOAD, u32>"));
+    assert!(!src.contains("Msg<LABEL_POLICY_ACTIVATE, u8>"));
+    assert!(!src.contains("Msg<LABEL_POLICY_REVERT, u8>"));
+    assert!(!src.contains("Msg<LABEL_POLICY_ANNOTATE, PolicyAnnotation>"));
 
     let _ = (EPF_ROLE_CONTROLLER, EPF_ROLE_CLUSTER);
     let _annotation = PolicyAnnotation { digest: 7 };
@@ -108,7 +121,6 @@ fn epf_runtime_executes_under_split_repo_dependency_shape() {
         &slots,
         Slot::Route,
         &TapEvent::zero(),
-        CapsMask::allow_all(),
         None,
         None,
         |ctx| {
