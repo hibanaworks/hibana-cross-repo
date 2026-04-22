@@ -2,15 +2,31 @@ use std::fs;
 use std::path::PathBuf;
 
 use hibana::substrate::{
-    policy::PolicySlot,
+    policy::{ContextValue, PolicyAttrs, PolicySlot, core as policy_core},
     tap::TapEvent,
-    transport::{TransportSnapshot, TransportSnapshotParts},
+    transport::TransportSnapshot,
 };
 use hibana_epf::{
     Action, Header, HostSlots, PolicyAnnotation, ROLE_CLUSTER as EPF_ROLE_CLUSTER,
     ROLE_CONTROLLER as EPF_ROLE_CONTROLLER, ScratchLease, Slot, loader::ImageLoader, run_with,
 };
 use hibana_mgmt::{LoadRequest, Request, SubscribeReq};
+
+fn manifest() -> String {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("read {} failed: {}", path.display(), err))
+}
+
+fn lockfile() -> String {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
+    fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("read {} failed: {}", path.display(), err))
+}
+
+fn workspace_smoke_mode() -> bool {
+    std::env::var_os("HIBANA_CROSS_REPO_WORKSPACE_SMOKE").is_some()
+}
 
 fn sibling_path(path: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -33,6 +49,18 @@ fn header_for(code: &[u8], mem_len: u16) -> Header {
         flags: 0,
         hash: hibana_epf::verifier::compute_hash(code),
     }
+}
+
+fn queue_depth_snapshot(queue_depth: u32) -> TransportSnapshot {
+    let mut attrs = PolicyAttrs::new();
+    assert!(
+        attrs.insert(
+            policy_core::QUEUE_DEPTH,
+            ContextValue::from_u32(queue_depth),
+        ),
+        "queue depth attr must fit in PolicyAttrs"
+    );
+    TransportSnapshot::from_policy_attrs(&attrs)
 }
 
 #[test]
@@ -68,6 +96,29 @@ fn mgmt_surface_uses_attach_helpers_without_raw_program_exports() {
         mem_len: 128,
     });
     let _subscribe = SubscribeReq::default();
+}
+
+#[test]
+fn manifest_default_lane_tracks_exact_git_revs() {
+    let cargo_toml = manifest();
+    assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
+    assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
+    assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
+    assert!(cargo_toml.contains("rev = \""));
+    assert!(!cargo_toml.contains("path = \"../hibana\""));
+    assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
+    assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
+}
+
+#[test]
+fn lockfile_pins_resolved_git_sources() {
+    if workspace_smoke_mode() {
+        return;
+    }
+    let cargo_lock = lockfile();
+    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana?rev="));
+    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev="));
+    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana-epf?rev="));
 }
 
 #[test]
@@ -124,10 +175,7 @@ fn epf_runtime_executes_under_split_repo_dependency_shape() {
         None,
         None,
         |ctx| {
-            ctx.set_transport_snapshot(TransportSnapshot::from_parts(TransportSnapshotParts {
-                queue_depth: Some(3),
-                ..TransportSnapshotParts::new()
-            }))
+            ctx.set_transport_snapshot(queue_depth_snapshot(3))
         },
     );
     assert_eq!(action, Action::Route { arm: 3 });
