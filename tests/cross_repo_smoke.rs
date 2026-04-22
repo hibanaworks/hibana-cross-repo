@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use hibana::substrate::{
     policy::{ContextValue, PolicyAttrs, PolicySlot, core as policy_core},
     tap::TapEvent,
-    transport::TransportSnapshot,
 };
 use hibana_epf::{
     Action, Header, HostSlots, PolicyAnnotation, ROLE_CLUSTER as EPF_ROLE_CLUSTER,
@@ -51,7 +50,7 @@ fn header_for(code: &[u8], mem_len: u16) -> Header {
     }
 }
 
-fn queue_depth_snapshot(queue_depth: u32) -> TransportSnapshot {
+fn queue_depth_attrs(queue_depth: u32) -> PolicyAttrs {
     let mut attrs = PolicyAttrs::new();
     assert!(
         attrs.insert(
@@ -60,7 +59,7 @@ fn queue_depth_snapshot(queue_depth: u32) -> TransportSnapshot {
         ),
         "queue depth attr must fit in PolicyAttrs"
     );
-    TransportSnapshot::from_policy_attrs(&attrs)
+    attrs
 }
 
 #[test]
@@ -175,7 +174,7 @@ fn epf_runtime_executes_under_split_repo_dependency_shape() {
         None,
         None,
         |ctx| {
-            ctx.set_transport_snapshot(queue_depth_snapshot(3))
+            ctx.set_policy_attrs(queue_depth_attrs(3))
         },
     );
     assert_eq!(action, Action::Route { arm: 3 });
