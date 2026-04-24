@@ -114,7 +114,9 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
-    assert!(cargo_toml.contains("rev = \""));
+    assert!(cargo_toml.contains("rev = \"e254bd2cc8a58452e50cbf069bed5293f0df042c\""));
+    assert!(cargo_toml.contains("rev = \"73744b159af0daf68ed3918d3295ece357844aa4\""));
+    assert!(cargo_toml.contains("rev = \"b9e86e3a6d88becfe0526840298ddc69b6f1a497\""));
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -126,9 +128,15 @@ fn lockfile_pins_resolved_git_sources() {
         return;
     }
     let cargo_lock = lockfile();
-    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana?rev="));
-    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev="));
-    assert!(cargo_lock.contains("source = \"git+https://github.com/hibanaworks/hibana-epf?rev="));
+    assert!(cargo_lock.contains(
+        "source = \"git+https://github.com/hibanaworks/hibana?rev=e254bd2cc8a58452e50cbf069bed5293f0df042c#e254bd2cc8a58452e50cbf069bed5293f0df042c\""
+    ));
+    assert!(cargo_lock.contains(
+        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=b9e86e3a6d88becfe0526840298ddc69b6f1a497#b9e86e3a6d88becfe0526840298ddc69b6f1a497\""
+    ));
+    assert!(cargo_lock.contains(
+        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=73744b159af0daf68ed3918d3295ece357844aa4#73744b159af0daf68ed3918d3295ece357844aa4\""
+    ));
 }
 
 #[test]

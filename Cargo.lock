@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "hibana"
 version = "0.1.0"
-source = "git+https://github.com/hibanaworks/hibana?rev=4d5e89199be35de2b77e73bd8f550375c63f2e3c#4d5e89199be35de2b77e73bd8f550375c63f2e3c"
+source = "git+https://github.com/hibanaworks/hibana?rev=e254bd2cc8a58452e50cbf069bed5293f0df042c#e254bd2cc8a58452e50cbf069bed5293f0df042c"
 
 [[package]]
 name = "hibana-cross-repo-smoke"
@@ -19,7 +19,7 @@ dependencies = [
 [[package]]
 name = "hibana-epf"
 version = "0.1.0"
-source = "git+https://github.com/hibanaworks/hibana-epf?rev=a98036395c2793f30bbc43d1b1f4761fc6c84457#a98036395c2793f30bbc43d1b1f4761fc6c84457"
+source = "git+https://github.com/hibanaworks/hibana-epf?rev=73744b159af0daf68ed3918d3295ece357844aa4#73744b159af0daf68ed3918d3295ece357844aa4"
 dependencies = [
  "hibana",
 ]
@@ -27,7 +27,7 @@ dependencies = [
 [[package]]
 name = "hibana-mgmt"
 version = "0.1.0"
-source = "git+https://github.com/hibanaworks/hibana-mgmt?rev=712387dfdd68002fdd6fc0414fbf7be9c6b0f774#712387dfdd68002fdd6fc0414fbf7be9c6b0f774"
+source = "git+https://github.com/hibanaworks/hibana-mgmt?rev=b9e86e3a6d88becfe0526840298ddc69b6f1a497#b9e86e3a6d88becfe0526840298ddc69b6f1a497"
 dependencies = [
  "hibana",
  "hibana-epf",
