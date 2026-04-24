@@ -49,7 +49,6 @@ fn header_for(code: &[u8], mem_len: u16) -> Header {
         code_len: code.len() as u16,
         fuel_max: 8,
         mem_len,
-        flags: 0,
         hash: hibana_epf::verifier::compute_hash(code),
     }
 }
