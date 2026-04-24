@@ -7,8 +7,8 @@ use hibana::substrate::{
     tap::TapEvent,
 };
 use hibana_epf::{
-    Action, ENGINE_FAIL_CLOSED, Header, HostSlots, PolicyAnnotation,
-    ROLE_CONTROLLER as EPF_ROLE_CONTROLLER, ScratchLease, Slot, loader::ImageLoader, run_with,
+    Action, ENGINE_FAIL_CLOSED, Header, HostSlots, ROLE_CONTROLLER as EPF_ROLE_CONTROLLER,
+    ScratchLease, Slot, loader::ImageLoader, run_with,
 };
 use hibana_mgmt::{LoadRequest, Request, SubscribeReq};
 
@@ -150,9 +150,9 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
-    assert!(cargo_toml.contains("rev = \"ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""));
-    assert!(cargo_toml.contains("rev = \"30a49a3caced9a92a94b1f2239e5f85b60ee9013\""));
-    assert!(cargo_toml.contains("rev = \"30b468705a57c207c1896de7dfd9a6ac8c6d45b0\""));
+    assert!(cargo_toml.contains("rev = \"9b95d66eaed007629a72f01b5f58666f1dd70786\""));
+    assert!(cargo_toml.contains("rev = \"069b30ea961ecb1cae91b190685119d852f55dbc\""));
+    assert!(cargo_toml.contains("rev = \"eb64330e6c89bc479aaaa239f5d6a4a849aba61e\""));
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -165,13 +165,13 @@ fn lockfile_pins_resolved_git_sources() {
     }
     let cargo_lock = lockfile();
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana?rev=ab2f2c90b04d9b80c97c6c69b864452463ee6df5#ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""
+        "source = \"git+https://github.com/hibanaworks/hibana?rev=9b95d66eaed007629a72f01b5f58666f1dd70786#9b95d66eaed007629a72f01b5f58666f1dd70786\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=30b468705a57c207c1896de7dfd9a6ac8c6d45b0#30b468705a57c207c1896de7dfd9a6ac8c6d45b0\""
+        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=eb64330e6c89bc479aaaa239f5d6a4a849aba61e#eb64330e6c89bc479aaaa239f5d6a4a849aba61e\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=30a49a3caced9a92a94b1f2239e5f85b60ee9013#30a49a3caced9a92a94b1f2239e5f85b60ee9013\""
+        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=069b30ea961ecb1cae91b190685119d852f55dbc#069b30ea961ecb1cae91b190685119d852f55dbc\""
     ));
 }
 
@@ -206,13 +206,14 @@ fn epf_surface_exposes_controller_lifecycle_attach_only() {
     assert!(src.contains("GenericCapToken<PolicyRevertKind>"));
     assert!(!src.contains("GenericCapToken<PolicyRestoreKind>"));
     assert!(src.contains("GenericCapToken<PolicyAnnotateKind>"));
+    assert!(!src.contains("pub struct PolicyAnnotation"));
+    assert!(!src.contains("WirePayload for PolicyAnnotation"));
     assert!(!src.contains("Msg<LABEL_POLICY_LOAD, u32>"));
     assert!(!src.contains("Msg<LABEL_POLICY_ACTIVATE, u8>"));
     assert!(!src.contains("Msg<LABEL_POLICY_RESTORE, u8>"));
     assert!(!src.contains("Msg<LABEL_POLICY_ANNOTATE, PolicyAnnotation>"));
 
     let _ = EPF_ROLE_CONTROLLER;
-    let _annotation = PolicyAnnotation { digest: 7 };
 }
 
 #[test]
