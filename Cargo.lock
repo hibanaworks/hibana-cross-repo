@@ -27,7 +27,7 @@ dependencies = [
 [[package]]
 name = "hibana-mgmt"
 version = "0.1.0"
-source = "git+https://github.com/hibanaworks/hibana-mgmt?rev=a889e00c3a48a90c7884501dccae488a46e94df3#a889e00c3a48a90c7884501dccae488a46e94df3"
+source = "git+https://github.com/hibanaworks/hibana-mgmt?rev=30b468705a57c207c1896de7dfd9a6ac8c6d45b0#30b468705a57c207c1896de7dfd9a6ac8c6d45b0"
 dependencies = [
  "hibana",
  "hibana-epf",
