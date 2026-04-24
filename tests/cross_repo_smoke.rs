@@ -2,15 +2,12 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
 
-use hibana::substrate::{
-    policy::{ContextValue, PolicyAttrs, PolicySlot, core as policy_core},
-    tap::TapEvent,
-};
+use hibana::substrate::tap::TapEvent;
 use hibana_epf::{
     Action, ENGINE_FAIL_CLOSED, Header, HostSlots, ROLE_CONTROLLER as EPF_ROLE_CONTROLLER,
-    ScratchLease, Slot, loader::ImageLoader, run_with,
+    ScratchLease, loader::ImageLoader, run_with, vm::Slot,
 };
-use hibana_mgmt::{LoadRequest, Request, SubscribeReq};
+use hibana_mgmt::SubscribeReq;
 
 const WORKSPACE_PATCH_SENTINEL: &str = "run_workspace_smoke.sh";
 
@@ -24,6 +21,29 @@ fn lockfile() -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.lock");
     fs::read_to_string(&path)
         .unwrap_or_else(|err| panic!("read {} failed: {}", path.display(), err))
+}
+
+fn manifest_rev(cargo_toml: &str, crate_name: &str) -> String {
+    let needle =
+        format!("{crate_name} = {{ git = \"https://github.com/hibanaworks/{crate_name}\", rev = \"");
+    let start = cargo_toml
+        .find(&needle)
+        .unwrap_or_else(|| panic!("manifest must pin {crate_name} to a GitHub rev"))
+        + needle.len();
+    let rev = cargo_toml[start..]
+        .split('"')
+        .next()
+        .unwrap_or_else(|| panic!("manifest rev for {crate_name} must be quoted"));
+    assert_eq!(
+        rev.len(),
+        40,
+        "manifest rev for {crate_name} must be a full commit SHA"
+    );
+    assert!(
+        rev.bytes().all(|byte| byte.is_ascii_hexdigit()),
+        "manifest rev for {crate_name} must be hex"
+    );
+    rev.to_owned()
 }
 
 fn workspace_smoke_mode() -> bool {
@@ -66,6 +86,27 @@ fn read_sibling_workspace_only(path: &str) -> String {
         .unwrap_or_else(|err| panic!("read {} failed: {}", full.display(), err))
 }
 
+fn assert_no_old_surface_paths(path: &str, src: &str) {
+    for forbidden in [
+        "g::advanced",
+        "hibana::g::advanced",
+        "hibana::substrate::Lane",
+        "hibana::substrate::SessionId",
+        "hibana::substrate::RendezvousId",
+        "use hibana::substrate::{\n    Lane",
+        "use hibana::substrate::{Lane",
+        "use hibana::substrate::{\n    SessionId",
+        "use hibana::substrate::{SessionId",
+        "substrate::{\n        AttachError, RendezvousId",
+        "substrate::{AttachError, RendezvousId",
+    ] {
+        assert!(
+            !src.contains(forbidden),
+            "{path} must not keep old surface path residue: {forbidden}"
+        );
+    }
+}
+
 fn header_for(code: &[u8], mem_len: u16) -> Header {
     Header {
         code_len: code.len() as u16,
@@ -73,18 +114,6 @@ fn header_for(code: &[u8], mem_len: u16) -> Header {
         mem_len,
         hash: hibana_epf::verifier::compute_hash(code),
     }
-}
-
-fn queue_depth_attrs(queue_depth: u32) -> PolicyAttrs {
-    let mut attrs = PolicyAttrs::new();
-    assert!(
-        attrs.insert(
-            policy_core::QUEUE_DEPTH,
-            ContextValue::from_u32(queue_depth),
-        ),
-        "queue depth attr must fit in PolicyAttrs"
-    );
-    attrs
 }
 
 #[test]
@@ -112,11 +141,11 @@ fn mgmt_surface_uses_attach_helpers_without_raw_program_exports() {
         "hibana-mgmt/src/observe_stream.rs",
     ] {
         let src = read_sibling_workspace_only(path);
+        assert_no_old_surface_paths(path, &src);
         assert!(src.contains("pub fn attach_controller"));
         assert!(src.contains("pub fn attach_cluster"));
         assert!(!src.contains("pub const PROGRAM"));
         assert!(!src.contains("pub const PREFIX"));
-        assert!(!src.contains("g::advanced::steps"));
         assert!(!src.contains("const APP: g::Program<_>"));
         assert!(!src.contains("static APP: g::Program<_>"));
         assert!(!src.contains("const PROGRAM: g::Program<_>"));
@@ -135,12 +164,20 @@ fn mgmt_surface_uses_attach_helpers_without_raw_program_exports() {
     assert!(!request_reply.contains("Msg<LABEL_MGMT_LOAD_BEGIN,"));
     assert!(!request_reply.contains("Msg<LABEL_MGMT_LOAD_COMMIT,"));
 
-    let _request = Request::LoadAndActivate(LoadRequest {
-        slot: PolicySlot::Route,
-        code: &[0x30, 0x03, 0x00, 0x01],
-        fuel_max: 64,
-        mem_len: 128,
-    });
+    let mgmt_kinds = read_sibling_workspace_only("hibana-mgmt/src/control_kinds.rs");
+    assert!(mgmt_kinds.contains("pub struct MgmtRouteKind<const LABEL: u8, const ARM: u8>;"));
+    assert!(
+        !mgmt_kinds.contains("pub type MgmtRoute"),
+        "hibana-mgmt route kind surface must not keep per-label aliases"
+    );
+
+    let mgmt_payload = read_sibling_workspace_only("hibana-mgmt/src/payload.rs");
+    assert!(mgmt_payload.contains("pub enum PolicyTarget"));
+    assert!(mgmt_payload.contains("pub target: PolicyTarget"));
+    assert!(
+        !mgmt_payload.contains("PolicySlot"),
+        "hibana-mgmt public payloads must not expose substrate advanced PolicySlot"
+    );
     let _subscribe = SubscribeReq::default();
 }
 
@@ -150,9 +187,9 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
-    assert!(cargo_toml.contains("rev = \"dbad661f3bcb9be17f23ca7c1764a9649f0487b7\""));
-    assert!(cargo_toml.contains("rev = \"5cffa1e5726e4c41d2927859d1a8e37e76233b5d\""));
-    assert!(cargo_toml.contains("rev = \"370ac3f9881dedeb41807cd453b68092bf0af5af\""));
+    for crate_name in ["hibana", "hibana-epf", "hibana-mgmt"] {
+        let _ = manifest_rev(&cargo_toml, crate_name);
+    }
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -163,16 +200,18 @@ fn lockfile_pins_resolved_git_sources() {
     if workspace_smoke_mode() {
         return;
     }
+    let cargo_toml = manifest();
     let cargo_lock = lockfile();
-    assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana?rev=dbad661f3bcb9be17f23ca7c1764a9649f0487b7#dbad661f3bcb9be17f23ca7c1764a9649f0487b7\""
-    ));
-    assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=370ac3f9881dedeb41807cd453b68092bf0af5af#370ac3f9881dedeb41807cd453b68092bf0af5af\""
-    ));
-    assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=5cffa1e5726e4c41d2927859d1a8e37e76233b5d#5cffa1e5726e4c41d2927859d1a8e37e76233b5d\""
-    ));
+    for crate_name in ["hibana", "hibana-epf", "hibana-mgmt"] {
+        let rev = manifest_rev(&cargo_toml, crate_name);
+        let expected = format!(
+            "source = \"git+https://github.com/hibanaworks/{crate_name}?rev={rev}#{rev}\""
+        );
+        assert!(
+            cargo_lock.contains(&expected),
+            "lockfile must resolve {crate_name} to the manifest rev"
+        );
+    }
 }
 
 #[test]
@@ -182,12 +221,13 @@ fn epf_surface_exposes_controller_lifecycle_attach_only() {
     }
 
     let src = read_sibling_workspace_only("hibana-epf/src/lib.rs");
+    assert_no_old_surface_paths("hibana-epf/src/lib.rs", &src);
     assert!(src.contains("pub fn attach_controller"));
     assert!(!src.contains("pub fn attach_cluster"));
     assert!(!src.contains("ROLE_CLUSTER"));
     assert!(!src.contains("pub const PROGRAM"));
     assert!(!src.contains("pub const PREFIX"));
-    assert!(!src.contains("g::advanced::steps"));
+    assert!(!src.contains("pub use vm::{Slot"));
     assert!(!src.contains("const APP: g::Program<_>"));
     assert!(!src.contains("static APP: g::Program<_>"));
     assert!(!src.contains("const PROGRAM: g::Program<_>"));
@@ -196,6 +236,7 @@ fn epf_surface_exposes_controller_lifecycle_attach_only() {
     assert!(!src.contains("project::<"));
 
     let kinds = read_sibling_workspace_only("hibana-epf/src/control_kinds.rs");
+    assert_no_old_surface_paths("hibana-epf/src/control_kinds.rs", &kinds);
     assert!(kinds.contains("pub struct PolicyLoadKind;"));
     assert!(kinds.contains("pub struct PolicyActivateKind;"));
     assert!(kinds.contains("pub struct PolicyRevertKind;"));
@@ -213,12 +254,45 @@ fn epf_surface_exposes_controller_lifecycle_attach_only() {
     assert!(!src.contains("Msg<LABEL_POLICY_RESTORE, u8>"));
     assert!(!src.contains("Msg<LABEL_POLICY_ANNOTATE, PolicyAnnotation>"));
 
+    let loader = read_sibling_workspace_only("hibana-epf/src/loader.rs");
+    assert!(
+        !loader.contains("pub fn commit("),
+        "hibana-epf loader must not expose slot-less verification"
+    );
+    assert!(loader.contains("pub fn commit_for_slot"));
+    assert!(loader.contains("VerifiedImage::from_parts_for_slot"));
+
+    let verifier = read_sibling_workspace_only("hibana-epf/src/verifier.rs");
+    assert!(
+        !verifier.contains("pub fn new(bytes"),
+        "hibana-epf verifier must not expose slot-less verification"
+    );
+    assert!(verifier.contains("pub fn new_for_slot"));
+
+    let vm = read_sibling_workspace_only("hibana-epf/src/vm.rs");
+    assert!(vm.contains("pub enum Slot"));
+    let old_policy_slot_alias = concat!(
+        "pub use hibana::substrate::policy",
+        "::advanced::PolicySlot as Slot"
+    );
+    assert!(
+        !vm.contains(old_policy_slot_alias),
+        "hibana-epf must own its slot vocabulary instead of aliasing substrate advanced"
+    );
+
+    let host = read_sibling_workspace_only("hibana-epf/src/host.rs");
+    assert!(
+        !host.contains("pub fn into_parts("),
+        "hibana-epf install failure surface must not expose duplicate decomposition"
+    );
+    assert!(host.contains("pub fn into_scratch(self) -> ScratchLease"));
+
     let _ = EPF_ROLE_CONTROLLER;
 }
 
 #[test]
 fn epf_runtime_executes_under_split_repo_dependency_shape() {
-    let code = [0x41, 0x00, 0x33, 0x00];
+    let code = [0x4B, 0x00, 0x00, 0x33, 0x00];
     let mut loader = ImageLoader::new();
     loader.begin(header_for(&code, 16)).expect("begin");
     loader.write(0, &code).expect("write");
@@ -231,14 +305,14 @@ fn epf_runtime_executes_under_split_repo_dependency_shape() {
         .expect("install");
 
     let action = run_with(&slots, Slot::Route, &TapEvent::zero(), None, None, |ctx| {
-        ctx.set_policy_attrs(queue_depth_attrs(1))
+        ctx.set_policy_input([1, 0, 0, 0])
     });
     assert_eq!(action, Action::Route { arm: 1 });
 }
 
 #[test]
 fn epf_runtime_rejects_non_binary_route_arm_under_split_repo_dependency_shape() {
-    let code = [0x41, 0x00, 0x33, 0x00];
+    let code = [0x4B, 0x00, 0x00, 0x33, 0x00];
     let mut loader = ImageLoader::new();
     loader.begin(header_for(&code, 16)).expect("begin");
     loader.write(0, &code).expect("write");
@@ -251,7 +325,7 @@ fn epf_runtime_rejects_non_binary_route_arm_under_split_repo_dependency_shape() 
         .expect("install");
 
     let action = run_with(&slots, Slot::Route, &TapEvent::zero(), None, None, |ctx| {
-        ctx.set_policy_attrs(queue_depth_attrs(3))
+        ctx.set_policy_input([3, 0, 0, 0])
     });
     assert!(matches!(
         action,
