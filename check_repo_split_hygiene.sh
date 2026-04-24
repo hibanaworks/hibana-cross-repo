@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HARNESS_CARGO="${ROOT_DIR}/Cargo.toml"
 HARNESS_LOCK="${ROOT_DIR}/Cargo.lock"
 HARNESS_README="${ROOT_DIR}/README.md"
+HARNESS_TEST="${ROOT_DIR}/tests/cross_repo_smoke.rs"
 WORKSPACE_SMOKE="${ROOT_DIR}/run_workspace_smoke.sh"
 
 FAILED=0
@@ -79,6 +80,16 @@ fi
 
 if ! grep -Fq './run_workspace_smoke.sh' "${HARNESS_README}"; then
   echo "cross-repo harness README must document the explicit workspace smoke lane" >&2
+  FAILED=1
+fi
+
+if ! grep -Fq 'HIBANA_CROSS_REPO_WORKSPACE_PATCHED=run_workspace_smoke.sh' "${WORKSPACE_SMOKE}"; then
+  echo "cross-repo workspace smoke runner must stamp patched source-read mode" >&2
+  FAILED=1
+fi
+
+if ! grep -Fq 'WORKSPACE_PATCH_SENTINEL' "${HARNESS_TEST}"; then
+  echo "cross-repo tests must gate local source reads behind the workspace patch sentinel" >&2
   FAILED=1
 fi
 

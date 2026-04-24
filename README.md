@@ -19,7 +19,8 @@ Canonical verification:
 - `cargo test --locked` validates the manifest-default exact GitHub BOM and
   the lockfile resolved from it
 - `./run_workspace_smoke.sh` remains available when callers want an explicit
-  local sibling worktree overlay
+  local sibling worktree overlay; setting the workspace-smoke env var by hand
+  does not enable local source reads
 
 The dedicated harness therefore carries two lanes:
 

@@ -26,7 +26,12 @@ for required in "${HIBANA_DIR}" "${HIBANA_EPF_DIR}" "${HIBANA_MGMT_DIR}"; do
   fi
 done
 
-HIBANA_CROSS_REPO_WORKSPACE_SMOKE=1 cargo +"${TOOLCHAIN}" test \
+HIBANA_CROSS_REPO_WORKSPACE_SMOKE=1 \
+HIBANA_CROSS_REPO_WORKSPACE_PATCHED=run_workspace_smoke.sh \
+HIBANA_CROSS_REPO_HIBANA_DIR="${HIBANA_DIR}" \
+HIBANA_CROSS_REPO_HIBANA_EPF_DIR="${HIBANA_EPF_DIR}" \
+HIBANA_CROSS_REPO_HIBANA_MGMT_DIR="${HIBANA_MGMT_DIR}" \
+cargo +"${TOOLCHAIN}" test \
   --config "patch.\"https://github.com/hibanaworks/hibana\".hibana.path=\"${HIBANA_DIR}\"" \
   --config "patch.\"https://github.com/hibanaworks/hibana-epf\".hibana-epf.path=\"${HIBANA_EPF_DIR}\"" \
   --config "patch.\"https://github.com/hibanaworks/hibana-mgmt\".hibana-mgmt.path=\"${HIBANA_MGMT_DIR}\""

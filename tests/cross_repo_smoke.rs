@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::PathBuf;
 
@@ -10,6 +11,8 @@ use hibana_epf::{
     ROLE_CONTROLLER as EPF_ROLE_CONTROLLER, ScratchLease, Slot, loader::ImageLoader, run_with,
 };
 use hibana_mgmt::{LoadRequest, Request, SubscribeReq};
+
+const WORKSPACE_PATCH_SENTINEL: &str = "run_workspace_smoke.sh";
 
 fn manifest() -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
@@ -24,20 +27,39 @@ fn lockfile() -> String {
 }
 
 fn workspace_smoke_mode() -> bool {
-    std::env::var_os("HIBANA_CROSS_REPO_WORKSPACE_SMOKE").is_some()
+    workspace_patch_enabled(
+        std::env::var_os("HIBANA_CROSS_REPO_WORKSPACE_SMOKE"),
+        std::env::var_os("HIBANA_CROSS_REPO_WORKSPACE_PATCHED"),
+    )
+}
+
+fn workspace_patch_enabled(smoke: Option<OsString>, patched: Option<OsString>) -> bool {
+    smoke.is_some() && patched.as_deref() == Some(std::ffi::OsStr::new(WORKSPACE_PATCH_SENTINEL))
+}
+
+fn workspace_repo_root(repo: &str) -> PathBuf {
+    let key = match repo {
+        "hibana" => "HIBANA_CROSS_REPO_HIBANA_DIR",
+        "hibana-epf" => "HIBANA_CROSS_REPO_HIBANA_EPF_DIR",
+        "hibana-mgmt" => "HIBANA_CROSS_REPO_HIBANA_MGMT_DIR",
+        _ => panic!("unknown cross-repo sibling: {repo}"),
+    };
+    std::env::var_os(key)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| panic!("workspace smoke script did not provide {key}"))
 }
 
 fn sibling_path(path: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("cross-repo harness has parent")
-        .join(path)
+    let (repo, rest) = path
+        .split_once('/')
+        .unwrap_or_else(|| panic!("sibling source path must start with repo name: {path}"));
+    workspace_repo_root(repo).join(rest)
 }
 
 fn read_sibling_workspace_only(path: &str) -> String {
     assert!(
         workspace_smoke_mode(),
-        "local sibling source reads are only valid in HIBANA_CROSS_REPO_WORKSPACE_SMOKE mode"
+        "local sibling source reads are only valid through run_workspace_smoke.sh patch mode"
     );
     let full = sibling_path(path);
     fs::read_to_string(&full)
@@ -63,6 +85,20 @@ fn queue_depth_attrs(queue_depth: u32) -> PolicyAttrs {
         "queue depth attr must fit in PolicyAttrs"
     );
     attrs
+}
+
+#[test]
+fn workspace_source_read_mode_requires_script_patch_sentinel() {
+    let smoke = Some(OsString::from("1"));
+    let sentinel = Some(OsString::from(WORKSPACE_PATCH_SENTINEL));
+
+    assert!(!workspace_patch_enabled(smoke.clone(), None));
+    assert!(!workspace_patch_enabled(None, sentinel.clone()));
+    assert!(!workspace_patch_enabled(
+        smoke.clone(),
+        Some(OsString::from("manual"))
+    ));
+    assert!(workspace_patch_enabled(smoke, sentinel));
 }
 
 #[test]
@@ -114,9 +150,9 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
-    assert!(cargo_toml.contains("rev = \"e254bd2cc8a58452e50cbf069bed5293f0df042c\""));
-    assert!(cargo_toml.contains("rev = \"73744b159af0daf68ed3918d3295ece357844aa4\""));
-    assert!(cargo_toml.contains("rev = \"b9e86e3a6d88becfe0526840298ddc69b6f1a497\""));
+    assert!(cargo_toml.contains("rev = \"ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""));
+    assert!(cargo_toml.contains("rev = \"30a49a3caced9a92a94b1f2239e5f85b60ee9013\""));
+    assert!(cargo_toml.contains("rev = \"a7912ac22aba8a32265f1a35a3bf2572bb6922a5\""));
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -129,13 +165,13 @@ fn lockfile_pins_resolved_git_sources() {
     }
     let cargo_lock = lockfile();
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana?rev=e254bd2cc8a58452e50cbf069bed5293f0df042c#e254bd2cc8a58452e50cbf069bed5293f0df042c\""
+        "source = \"git+https://github.com/hibanaworks/hibana?rev=ab2f2c90b04d9b80c97c6c69b864452463ee6df5#ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=b9e86e3a6d88becfe0526840298ddc69b6f1a497#b9e86e3a6d88becfe0526840298ddc69b6f1a497\""
+        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=a7912ac22aba8a32265f1a35a3bf2572bb6922a5#a7912ac22aba8a32265f1a35a3bf2572bb6922a5\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=73744b159af0daf68ed3918d3295ece357844aa4#73744b159af0daf68ed3918d3295ece357844aa4\""
+        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=30a49a3caced9a92a94b1f2239e5f85b60ee9013#30a49a3caced9a92a94b1f2239e5f85b60ee9013\""
     ));
 }
 
