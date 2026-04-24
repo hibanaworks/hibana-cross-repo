@@ -15,4 +15,4 @@ default = []
 [dependencies]
 hibana = { git = "https://github.com/hibanaworks/hibana", rev = "ab2f2c90b04d9b80c97c6c69b864452463ee6df5", default-features = false, features = ["std"] }
 hibana-epf = { git = "https://github.com/hibanaworks/hibana-epf", rev = "30a49a3caced9a92a94b1f2239e5f85b60ee9013", default-features = false, features = ["std"] }
-hibana-mgmt = { git = "https://github.com/hibanaworks/hibana-mgmt", rev = "02c654f587c82b11445bb612e38f57d477a602e7", default-features = false, features = ["std"] }
+hibana-mgmt = { git = "https://github.com/hibanaworks/hibana-mgmt", rev = "a889e00c3a48a90c7884501dccae488a46e94df3", default-features = false, features = ["std"] }
