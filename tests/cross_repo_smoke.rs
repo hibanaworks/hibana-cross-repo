@@ -150,9 +150,9 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-mgmt\""));
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
-    assert!(cargo_toml.contains("rev = \"9b95d66eaed007629a72f01b5f58666f1dd70786\""));
-    assert!(cargo_toml.contains("rev = \"069b30ea961ecb1cae91b190685119d852f55dbc\""));
-    assert!(cargo_toml.contains("rev = \"eb64330e6c89bc479aaaa239f5d6a4a849aba61e\""));
+    assert!(cargo_toml.contains("rev = \"53fe08fe5169fd5bb2f3012ef83e1ac8a221b081\""));
+    assert!(cargo_toml.contains("rev = \"2f4fd88c64c7acf8fc31a5f27a0cbdb6872df1fd\""));
+    assert!(cargo_toml.contains("rev = \"72f7813ead74dea13bc3d1a096c467af5427e915\""));
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -165,13 +165,13 @@ fn lockfile_pins_resolved_git_sources() {
     }
     let cargo_lock = lockfile();
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana?rev=9b95d66eaed007629a72f01b5f58666f1dd70786#9b95d66eaed007629a72f01b5f58666f1dd70786\""
+        "source = \"git+https://github.com/hibanaworks/hibana?rev=53fe08fe5169fd5bb2f3012ef83e1ac8a221b081#53fe08fe5169fd5bb2f3012ef83e1ac8a221b081\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=eb64330e6c89bc479aaaa239f5d6a4a849aba61e#eb64330e6c89bc479aaaa239f5d6a4a849aba61e\""
+        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=72f7813ead74dea13bc3d1a096c467af5427e915#72f7813ead74dea13bc3d1a096c467af5427e915\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=069b30ea961ecb1cae91b190685119d852f55dbc#069b30ea961ecb1cae91b190685119d852f55dbc\""
+        "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=2f4fd88c64c7acf8fc31a5f27a0cbdb6872df1fd#2f4fd88c64c7acf8fc31a5f27a0cbdb6872df1fd\""
     ));
 }
 
