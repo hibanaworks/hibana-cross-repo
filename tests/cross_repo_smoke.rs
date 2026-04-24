@@ -152,7 +152,7 @@ fn manifest_default_lane_tracks_exact_git_revs() {
     assert!(cargo_toml.contains("git = \"https://github.com/hibanaworks/hibana-epf\""));
     assert!(cargo_toml.contains("rev = \"ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""));
     assert!(cargo_toml.contains("rev = \"30a49a3caced9a92a94b1f2239e5f85b60ee9013\""));
-    assert!(cargo_toml.contains("rev = \"a7912ac22aba8a32265f1a35a3bf2572bb6922a5\""));
+    assert!(cargo_toml.contains("rev = \"02c654f587c82b11445bb612e38f57d477a602e7\""));
     assert!(!cargo_toml.contains("path = \"../hibana\""));
     assert!(!cargo_toml.contains("path = \"../hibana-mgmt\""));
     assert!(!cargo_toml.contains("path = \"../hibana-epf\""));
@@ -168,7 +168,7 @@ fn lockfile_pins_resolved_git_sources() {
         "source = \"git+https://github.com/hibanaworks/hibana?rev=ab2f2c90b04d9b80c97c6c69b864452463ee6df5#ab2f2c90b04d9b80c97c6c69b864452463ee6df5\""
     ));
     assert!(cargo_lock.contains(
-        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=a7912ac22aba8a32265f1a35a3bf2572bb6922a5#a7912ac22aba8a32265f1a35a3bf2572bb6922a5\""
+        "source = \"git+https://github.com/hibanaworks/hibana-mgmt?rev=02c654f587c82b11445bb612e38f57d477a602e7#02c654f587c82b11445bb612e38f57d477a602e7\""
     ));
     assert!(cargo_lock.contains(
         "source = \"git+https://github.com/hibanaworks/hibana-epf?rev=30a49a3caced9a92a94b1f2239e5f85b60ee9013#30a49a3caced9a92a94b1f2239e5f85b60ee9013\""
