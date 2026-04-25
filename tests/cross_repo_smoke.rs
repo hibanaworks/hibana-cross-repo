@@ -24,8 +24,9 @@ fn lockfile() -> String {
 }
 
 fn manifest_rev(cargo_toml: &str, crate_name: &str) -> String {
-    let needle =
-        format!("{crate_name} = {{ git = \"https://github.com/hibanaworks/{crate_name}\", rev = \"");
+    let needle = format!(
+        "{crate_name} = {{ git = \"https://github.com/hibanaworks/{crate_name}\", rev = \""
+    );
     let start = cargo_toml
         .find(&needle)
         .unwrap_or_else(|| panic!("manifest must pin {crate_name} to a GitHub rev"))
@@ -204,9 +205,8 @@ fn lockfile_pins_resolved_git_sources() {
     let cargo_lock = lockfile();
     for crate_name in ["hibana", "hibana-epf", "hibana-mgmt"] {
         let rev = manifest_rev(&cargo_toml, crate_name);
-        let expected = format!(
-            "source = \"git+https://github.com/hibanaworks/{crate_name}?rev={rev}#{rev}\""
-        );
+        let expected =
+            format!("source = \"git+https://github.com/hibanaworks/{crate_name}?rev={rev}#{rev}\"");
         assert!(
             cargo_lock.contains(&expected),
             "lockfile must resolve {crate_name} to the manifest rev"

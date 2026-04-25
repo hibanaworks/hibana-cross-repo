@@ -24,12 +24,20 @@ done
 
 run_sibling_crate() {
   local crate_dir="$1"
+  shift
   (
     cd "${crate_dir}"
-    cargo +"${TOOLCHAIN}" check --no-default-features
-    cargo +"${TOOLCHAIN}" test --features std
+    cargo +"${TOOLCHAIN}" check --no-default-features "$@"
+    cargo +"${TOOLCHAIN}" test --features std "$@"
   )
 }
+
+HIBANA_PATCH=(
+  --config "patch.\"https://github.com/hibanaworks/hibana\".hibana.path=\"${HIBANA_DIR}\""
+)
+HIBANA_EPF_PATCH=(
+  --config "patch.\"https://github.com/hibanaworks/hibana-epf\".hibana-epf.path=\"${HIBANA_EPF_DIR}\""
+)
 
 mkdir -p "${SMOKE_DIR}/src" "${SMOKE_DIR}/tests"
 cp "${ROOT_DIR}/Cargo.toml" "${SMOKE_DIR}/Cargo.toml"
@@ -50,5 +58,5 @@ cargo +"${TOOLCHAIN}" test \
   --config "patch.\"https://github.com/hibanaworks/hibana-epf\".hibana-epf.path=\"${HIBANA_EPF_DIR}\"" \
   --config "patch.\"https://github.com/hibanaworks/hibana-mgmt\".hibana-mgmt.path=\"${HIBANA_MGMT_DIR}\""
 
-run_sibling_crate "${HIBANA_EPF_DIR}"
-run_sibling_crate "${HIBANA_MGMT_DIR}"
+run_sibling_crate "${HIBANA_EPF_DIR}" "${HIBANA_PATCH[@]}"
+run_sibling_crate "${HIBANA_MGMT_DIR}" "${HIBANA_PATCH[@]}" "${HIBANA_EPF_PATCH[@]}"
